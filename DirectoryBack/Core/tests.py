@@ -140,3 +140,21 @@ class TestHome(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(File.objects.filter(file_name="new_test_file").count(), 1)
         self.assertEqual(File.objects.count(), 1)
+
+    def test_home_delete_directory(self):
+        self.client.force_login(self.user)
+        response = self.client.delete(reverse('directory'),
+        data = json.dumps({"id": 1}), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["delete"], True)
+        self.assertEqual(Directory.objects.count(), 0)
+
+    def test_home_delete_file(self):
+        self.client.force_login(self.user)
+        response = self.client.delete(reverse('file'),
+        data = json.dumps({"id": 1}), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["delete"], True)
+        self.assertEqual(File.objects.count(), 0)

@@ -58,6 +58,10 @@ class Home(APIView):
             "files": filesSerializer.data,
         })
 
+class UnAuth(APIView):
+    def delete(self, request):
+        pass #logout
+
 class Directories(APIView):
     def post(self, request):
         serializer = DirectoryCreateSerializer(data=request.data)
@@ -73,7 +77,8 @@ class Directories(APIView):
         return Response(serializer.data, status=HTTP_200_OK)
 
     def delete(self, request):
-        pass
+        Directory.objects.filter(id=request.data.get('id'), owner=request.user).delete()
+        return Response({"delete": True}, status=HTTP_200_OK)
 
 class Files(APIView):
     def post(self, request):
@@ -93,4 +98,5 @@ class Files(APIView):
         return Response(serializer.data, status=HTTP_200_OK)
 
     def delete(self, request):
-        pass
+        File.objects.filter(id=request.data.get('id'), directory__owner=request.user).delete()
+        return Response({"delete": True}, status=HTTP_200_OK)
