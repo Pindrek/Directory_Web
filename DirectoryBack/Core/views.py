@@ -2,6 +2,8 @@ from django.contrib.auth import login, logout, authenticate
 from rest_framework.status import HTTP_401_UNAUTHORIZED, HTTP_400_BAD_REQUEST, HTTP_409_CONFLICT, HTTP_200_OK, HTTP_201_CREATED
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 
 from .models import *
 from Core.serializers.userProfileSerializers import UserProfileSerializer
@@ -42,8 +44,10 @@ class Login(APIView):
             return Response({"error": "invalid credentials"}, status=HTTP_401_UNAUTHORIZED)
 
 class Home(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        userProfile = UserProfile.objects.get(user=request.user)
+        userProfile = get_object_or_404(UserProfile, user=request.user)
         userProfileSerializer = UserProfileSerializer(userProfile, many=False)
 
         directories = Directory.objects.filter(owner=request.user)
@@ -60,27 +64,33 @@ class Home(APIView):
 
 class UnAuth(APIView):
     def delete(self, request):
-        pass #logout
+        logout(request)
+        return Response({"logout": True}, status=HTTP_200_OK)
 
 class Directories(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = DirectoryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(owner=request.user)
-        return Response(serializer.data, HTTP_200_OK)
+        return Response(serializer.data, status=HTTP_201_CREATED)
 
     def patch(self, request):
-        object_ = Directory.objects.get(id=request.data.get('id'))
+        object_ = get_object_or_404(Directory, id=request.data.get("id"), owner=request.user)
         object_.directory_name = request.data.get('directory_name')
         object_.save()
         serializer = DirectorySerializer(object_)
         return Response(serializer.data, status=HTTP_200_OK)
 
     def delete(self, request):
-        Directory.objects.filter(id=request.data.get('id'), owner=request.user).delete()
+        directory = get_object_or_404(Directory, id=request.data.get("id"), owner=request.user)
+        directory.delete()
         return Response({"delete": True}, status=HTTP_200_OK)
 
 class Files(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = FileCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -91,12 +101,13 @@ class Files(APIView):
         return Response(serializer.data, status=HTTP_201_CREATED)
 
     def patch(self, request):
-        object_ = File.objects.get(id=request.data.get('id'))
+        object_ = get_object_or_404(File, id=request.data.get("id"), directory__owner=request.user)
         object_.file_name = request.data.get('file_name')
         object_.save()
         serializer = FileSerializer(object_)
         return Response(serializer.data, status=HTTP_200_OK)
 
     def delete(self, request):
-        File.objects.filter(id=request.data.get('id'), directory__owner=request.user).delete()
+        file = get_object_or_404(File, id=request.data.get("id"), directory__owner=request.user)
+        file.delete()
         return Response({"delete": True}, status=HTTP_200_OK)

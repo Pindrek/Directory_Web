@@ -7,4 +7,5 @@ urlpatterns = [
     path('home/', Home.as_view(), name='home'),
     path('home/direcotry/', Directories.as_view(), name='directory'),
     path('home/file/', Files.as_view(), name='file'),
+    path('home/logout/', UnAuth.as_view(), name='logout'),
 ]

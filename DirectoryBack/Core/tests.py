@@ -20,6 +20,7 @@ class AuthTest(TestCase):
         self.assertEqual(response.json()["sign_up"], True)
         self.assertEqual(User.objects.filter(username="user").count(), 1)
         self.assertEqual(UserProfile.objects.count(), 1)
+        self.assertIn("_auth_user_id", self.client.session)
 
     def test_sign_up_no_user(self):
         response = self.client.post(reverse('sign_up'),
@@ -48,6 +49,7 @@ class AuthTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["login"], True)
         self.assertEqual(User.objects.count(), 1)
+        self.assertIn("_auth_user_id", self.client.session)
 
     def test_login_no_user(self):
         response = self.client.post(reverse('login'),
@@ -89,21 +91,24 @@ class TestHome(TestCase):
         self.assertEqual(data["userProfile"]["id"], 1)
         self.assertEqual(data["userProfile"]["image_profile"], "/ProfileImages/test.jpg")
         self.assertEqual(data["userProfile"]["user"], 1)
+        self.assertEqual(UserProfile.objects.count(), 1)
 
         self.assertEqual(data["directories"][0]["id"], 1)
         self.assertEqual(data["directories"][0]["directory_name"], "test_directory")
         self.assertEqual(data["directories"][0]["owner"], 1)
+        self.assertEqual(Directory.objects.count(), 1)
 
         self.assertEqual(data["files"][0]["id"], 1)
         self.assertEqual(data["files"][0]["img"], "/Images/test.jpg")
         self.assertEqual(data["files"][0]["file_name"], "test_file")
         self.assertEqual(data["files"][0]["directory"], 1)
+        self.assertEqual(File.objects.count(), 1)
 
     def test_home_create_directory(self):
         self.client.force_login(self.user)
         response = self.client.post(reverse('directory'),
         data=json.dumps({"directory_name": "test_directory_2"}), content_type="application/json")
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
         data = json.loads(response.content)
         self.assertEqual(data["directory_name"], "test_directory_2")
         self.assertEqual(Directory.objects.count(), 2)
@@ -133,12 +138,28 @@ class TestHome(TestCase):
         self.assertEqual(Directory.objects.filter(directory_name="new_test_directory").count(), 1)
         self.assertEqual(Directory.objects.count(), 1)
 
+    def test_home_wrong_update_directory(self):
+        self.client.force_login(self.user)
+        response = self.client.patch(reverse('directory'),
+        data = json.dumps({"directory_name": "new_test_directory", "id": 792}), content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Directory.objects.filter(directory_name="test_directory").count(), 1)
+        self.assertEqual(Directory.objects.count(), 1)
+
     def test_home_update_file(self):
         self.client.force_login(self.user)
         response = self.client.patch(reverse('file'),
         data = json.dumps({"file_name": "new_test_file", "id": 1}), content_type="application/json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(File.objects.filter(file_name="new_test_file").count(), 1)
+        self.assertEqual(File.objects.count(), 1)
+
+    def test_home_wrong_update_file(self):
+        self.client.force_login(self.user)
+        response = self.client.patch(reverse('file'),
+        data = json.dumps({"file_name": "new_test_file", "id": 792}), content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(File.objects.filter(file_name="test_file").count(), 1)
         self.assertEqual(File.objects.count(), 1)
 
     def test_home_delete_directory(self):
@@ -150,6 +171,14 @@ class TestHome(TestCase):
         self.assertEqual(data["delete"], True)
         self.assertEqual(Directory.objects.count(), 0)
 
+    def test_home_wrong_delete_directory(self):
+        self.client.force_login(self.user)
+        response = self.client.delete(reverse('directory'),
+        data = json.dumps({"id": 792}), content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Directory.objects.filter(directory_name="test_directory").count(), 1)
+        self.assertEqual(Directory.objects.count(), 1)
+
     def test_home_delete_file(self):
         self.client.force_login(self.user)
         response = self.client.delete(reverse('file'),
@@ -158,3 +187,19 @@ class TestHome(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["delete"], True)
         self.assertEqual(File.objects.count(), 0)
+
+    def test_home_wrong_delete_file(self):
+        self.client.force_login(self.user)
+        response = self.client.delete(reverse('file'),
+        data = json.dumps({"id": 792}), content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(File.objects.filter(file_name="test_file").count(), 1)
+        self.assertEqual(File.objects.count(), 1)
+
+    def test_logout(self):
+        self.client.force_login(self.user)
+        response = self.client.delete(reverse('logout'))
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["logout"], True)
+        self.assertNotIn("_auth_user_id", self.client.session)
