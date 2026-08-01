@@ -108,30 +108,28 @@ class Files(APIView):
     permission_classes = [IsAuthenticated]
     pagination_class = FilePagination
 
-    def post(self, request):
+    def post(self, request, directory_id):
+        directory = get_object_or_404(Directory, id=directory_id, owner=request.user)
         serializer = FileCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        directory = serializer.validated_data['directory']
-        if directory.owner != request.user:
-            return Response({"error": "invalid owner"}, status=HTTP_401_UNAUTHORIZED)
-        serializer.save()
+        serializer.save(directory=directory)
         return Response(serializer.data, status=HTTP_201_CREATED)
 
-    def patch(self, request):
-        file = get_object_or_404(File, id=request.data.get("id"), directory__owner=request.user)
+    def patch(self, request, directory_id):
+        file = get_object_or_404(File, id=directory_id, directory__owner=request.user)
         serializer = FileSerializer(file, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=HTTP_200_OK)
 
-    def get(self, request):
-        files = File.objects.filter(directory=request.query_params.get("directory_id"), directory__owner=request.user)
+    def get(self, request, directory_id):
+        files = File.objects.filter(directory=directory_id, directory__owner=request.user)
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(files, request)
         serializer = FileSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
-    def delete(self, request):
-        file = get_object_or_404(File, id=request.data.get("id"), directory__owner=request.user)
+    def delete(self, request, directory_id):
+        file = get_object_or_404(File, id=directory_id, directory__owner=request.user)
         file.delete()
         return Response({"delete": True}, status=HTTP_200_OK)

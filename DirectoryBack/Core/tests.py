@@ -83,6 +83,7 @@ class TestHome(TestCase):
         self.profile = UserProfile.objects.create(user=self.user, image_profile="ProfileImages/test.jpg")
         self.directory = Directory.objects.create(owner=self.user, directory_name="test_directory")
         self.file = File.objects.create(img="Images/test.jpg", file_name="test_file", directory=self.directory)
+
         self.refresh = refresh = RefreshToken.for_user(self.user)
         self.access = access = str(refresh.access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
@@ -114,13 +115,12 @@ class TestHome(TestCase):
 
     def test_home_create_file(self):
         image = create_test_image()
-        response = self.client.post(reverse('file'),{"img": image, "file_name": "test_file_2", "directory": self.directory.id},)
+        response = self.client.post(reverse('file', kwargs={"directory_id": self.directory.id}),
+                                    {"img": image, "file_name": "test_file_2"},)
         self.assertEqual(response.status_code, 201)
-        data = json.loads(response.content)
+        data = response.json()
         self.assertEqual(data["img"], "/Images/test_2.jpg")
         self.assertEqual(data["file_name"], "test_file_2")
-        self.assertEqual(data["directory"], self.directory.id)
-        self.assertEqual(File.objects.count(), 2)
         self.assertEqual(File.objects.filter(file_name="test_file_2").count(), 1)
         self.assertEqual(File.objects.count(), 2)
         created_file = File.objects.get(file_name="test_file_2")
@@ -142,15 +142,15 @@ class TestHome(TestCase):
         self.assertEqual(Directory.objects.count(), 1)
 
     def test_home_update_file(self):
-        response = self.client.patch(reverse('file'),
-        data = json.dumps({"file_name": "new_test_file", "id": 1}), content_type="application/json")
+        response = self.client.patch(reverse('file', kwargs={"directory_id": self.directory.id}),
+        data = json.dumps({"file_name": "new_test_file"}), content_type="application/json")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(File.objects.filter(file_name="new_test_file").count(), 1)
+        self.assertEqual(File.objects.filter(directory=self.directory.id, file_name="new_test_file").count(), 1)
         self.assertEqual(File.objects.count(), 1)
 
     def test_home_wrong_update_file(self):
-        response = self.client.patch(reverse('file'),
-        data = json.dumps({"file_name": "new_test_file", "id": 792}), content_type="application/json")
+        response = self.client.patch(reverse('file', kwargs={"directory_id": 792}),
+        data = json.dumps({"file_name": "new_test_file"}), content_type="application/json")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(File.objects.filter(file_name="test_file").count(), 1)
         self.assertEqual(File.objects.count(), 1)
@@ -171,16 +171,14 @@ class TestHome(TestCase):
         self.assertEqual(Directory.objects.count(), 1)
 
     def test_home_delete_file(self):
-        response = self.client.delete(reverse('file'),
-        data = json.dumps({"id": 1}), content_type="application/json")
+        response = self.client.delete(reverse('file', kwargs={"directory_id": self.directory.id}), content_type="application/json")
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual(data["delete"], True)
         self.assertEqual(File.objects.count(), 0)
 
     def test_home_wrong_delete_file(self):
-        response = self.client.delete(reverse('file'),
-        data = json.dumps({"id": 792}), content_type="application/json")
+        response = self.client.delete(reverse('file', kwargs={"directory_id": 792}),  content_type="application/json")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(File.objects.filter(file_name="test_file").count(), 1)
         self.assertEqual(File.objects.count(), 1)
@@ -208,7 +206,7 @@ class TestHome(TestCase):
         self.dir = Directory.objects.create(directory_name="test_directory_2", owner=self.user)
         File.objects.create(img="Images/test_2.jpg", file_name="test_file_2", directory=self.dir)
         File.objects.create(img="Images/test_3.jpg", file_name="test_file_3", directory=self.dir)
-        response = self.client.get(reverse('file'), {"directory_id": self.dir.id})
+        response = self.client.get(reverse('file', kwargs={"directory_id": self.dir.id}), content_type="application/json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["results"]), 2)
         self.assertEqual(response.data["results"][0]["file_name"], "test_file_2")
@@ -218,11 +216,11 @@ class TestHome(TestCase):
         self.dir = Directory.objects.create(directory_name="test_directory_2", owner=self.user)
         for i in range(100):
             File.objects.create(file_name=f"test_pagination_{i}", directory=self.dir)
-        response_1 = self.client.get(reverse('file'), {"directory_id": self.dir.id})
+        response_1 = self.client.get(reverse('file', kwargs={"directory_id": self.dir.id}), {"page": 1})
         self.assertEqual(response_1.status_code, 200)
         self.assertEqual(response_1.data["count"], 100)
         self.assertEqual(len(response_1.data["results"]), 24)
-        response_2 = self.client.get(reverse('file'), {"directory_id": self.dir.id, "page": 5})
+        response_2 = self.client.get(reverse('file', kwargs={"directory_id": self.dir.id}), {"page": 5})
         self.assertEqual(response_2.status_code, 200)
         self.assertEqual(response_2.data["count"], 100)
         self.assertEqual(len(response_2.data["results"]), 4)

@@ -7,7 +7,6 @@ class FileCreateSerializer(serializers.ModelSerializer):
         fields = [
             'img',
             'file_name',
-            'directory',
         ]
 
 class FileSerializer(serializers.ModelSerializer):
